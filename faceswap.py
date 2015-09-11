@@ -27,16 +27,24 @@ def get_landmarks(im, min_area=None):
             yield face, landmarks
 
 def normalize_landmarks(face, landmarks):
-    center = np.asarray([face.center().x, face.center().y])
-    landmarks_centered = landmarks[transform.NORM_POINTS][::2] - center
-    diff_last_point = landmarks_centered[:-1] - landmarks_centered[1:]
-    turning = np.arctan2(diff_last_point[:,1], diff_last_point[:,0])
-    return turning
+    scale = [float(face.width()), float(face.height())]
+    nose = landmarks[transform.NOSE_POINTS] / scale
+    eyes = landmarks[transform.LEFT_EYE_POINTS + transform.RIGHT_EYE_POINTS] / scale
+    # angle of the nose
+    nose_angle = np.arctan2(nose[3,1] - nose[1,1], nose[3,0] - nose[0,0])
+    eye_angle = np.arctan2(eyes[6,1] - eyes[3,1], eyes[6,0] - eyes[3,0])
+    # orientation and size of the nose
+    orientation = np.cross(nose[4,:] - nose[6,:], nose[7,:] - nose[6,:])
+    return [nose_angle, eye_angle, orientation]
 
 def annotate_landmarks(im, landmarks):
     im = im.copy()
     for idx, point in enumerate(landmarks):
         pos = tuple(point)
+        cv2.putText(im, str(idx), pos,
+                    fontFace=cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,
+                    fontScale=0.4,
+                    color=(0, 0, 255))
         cv2.circle(im, pos, 3, color=(0, 255, 255, 0.5))
     return im
 
@@ -49,31 +57,31 @@ if __name__ == "__main__":
     from scipy.spatial import KDTree
     print "Making DB"
     landmarks_db = []
-    # db_files = ["images/micha_fb{}.jpg".format(i) for i in xrange(1,6)]
-    db_files = ['cruz.png', 'trump.jpg']
+    db_files = ["images/micha_fb{}.jpg".format(i) for i in xrange(1,6)]
+    db_files += ['cruz.png', 'trump.jpg', "images/abby_fb1.jpg"]
     for image in db_files:
         db_image, landmarks_gen = read_im_and_landmarks(image)
         landmarks_db.extend([(db_image, f, l) for f,l in landmarks_gen])
     data = [normalize_landmarks(f, l) for _, f,l in landmarks_db]
     database = KDTree(data)
 
-    #for i, (image, face, landmarks) in enumerate(landmarks_db):
-    #    im = annotate_landmarks(image, landmarks[transform.ALIGN_POINTS])
-    #    cv2.imwrite(
-    #        "faces/face_{:04d}.jpg".format(i), 
-    #        im[
-    #            face.top():face.bottom(),
-    #            face.left():face.right()
-    #        ]
-    #    )
+    for i, (image, face, landmarks) in enumerate(landmarks_db):
+        im = annotate_landmarks(image, landmarks[transform.LEFT_EYE_POINTS + transform.RIGHT_EYE_POINTS])
+        cv2.imwrite(
+            "faces/face_{:04d}.jpg".format(i), 
+            im[
+                face.top():face.bottom(),
+                face.left():face.right()
+            ]
+        )
 
     print "Matching faces"
-    image, landmarks_gen = read_im_and_landmarks("images/micha_fb2.jpg")
+    image, landmarks_gen = read_im_and_landmarks("images/micha_fb6.jpg")
     for i, (face, landmarks) in enumerate(landmarks_gen):
         norm_landmarks = normalize_landmarks(face, landmarks)
         search = database.query(norm_landmarks)
         print search
-        if search[0] > 0:
+        if search[0] < 2.0:
             closest_match = search[1]
             db_image, db_face, db_landmarks = landmarks_db[closest_match]
             image = transform.faceswap(db_image, db_landmarks, image, landmarks)
