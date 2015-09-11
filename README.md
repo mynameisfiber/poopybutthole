@@ -1,12 +1,12 @@
-= Poopy Butthole =
+# Poopy Butthole 
 
-![](mrpoopy.png)
+![](mrpoopy.jpg)
 
 Using the power of science, we swap faces in a target image with faces from a
 pre-collected database.
 
 
-== dependencies ==
+## dependencies
     - dlib (good luck installing this one)
     - cv2
     - numpy
