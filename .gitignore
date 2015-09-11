@@ -3,3 +3,4 @@
 *.sw*
 *.pyc
 *.so
+!mrpoopy.jpg
