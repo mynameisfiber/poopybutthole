@@ -34,7 +34,11 @@ def normalize_landmarks(face, landmarks):
     nose_angle = np.arctan2(nose[3,1] - nose[1,1], nose[3,0] - nose[0,0])
     eye_angle = np.arctan2(eyes[6,1] - eyes[3,1], eyes[6,0] - eyes[3,0])
     # orientation and size of the nose
-    orientation = np.cross(nose[4,:] - nose[6,:], nose[7,:] - nose[6,:])
+    left_nose = nose[4,:] - nose[6,:]
+    left_nose /= np.linalg.norm(left_nose)
+    right_nose = nose[7,:] - nose[6,:]
+    right_nose /= np.linalg.norm(right_nose)
+    orientation = np.cross(left_nose, right_nose)
     return [nose_angle, eye_angle, orientation]
 
 def annotate_landmarks(im, landmarks):
