@@ -5,7 +5,6 @@ import numpy as np
 import transform
 
 PREDICTOR_PATH = "data/shape_predictor_68_face_landmarks.dat"
-SCALE_FACTOR = 1 
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(PREDICTOR_PATH)
@@ -57,8 +56,9 @@ def read_im_and_landmarks(fname, min_area=None):
     landmark_gen = get_landmarks(im, min_area=min_area)
     return im, landmark_gen
 
+
 if __name__ == "__main__":
-    from scipy.spatial import KDTree
+    from scipy.spatial import cKDTree
     print "Making DB"
     landmarks_db = []
     db_files = ["images/micha_fb{}.jpg".format(i) for i in xrange(1,6)]
@@ -67,17 +67,7 @@ if __name__ == "__main__":
         db_image, landmarks_gen = read_im_and_landmarks(image)
         landmarks_db.extend([(db_image, f, l) for f,l in landmarks_gen])
     data = [normalize_landmarks(f, l) for _, f,l in landmarks_db]
-    database = KDTree(data)
-
-    for i, (image, face, landmarks) in enumerate(landmarks_db):
-        im = annotate_landmarks(image, landmarks[transform.LEFT_EYE_POINTS + transform.RIGHT_EYE_POINTS])
-        cv2.imwrite(
-            "faces/face_{:04d}.jpg".format(i), 
-            im[
-                face.top():face.bottom(),
-                face.left():face.right()
-            ]
-        )
+    database = cKDTree(data)
 
     print "Matching faces"
     image, landmarks_gen = read_im_and_landmarks("images/micha_fb6.jpg")
@@ -88,7 +78,7 @@ if __name__ == "__main__":
         if search[0] < 2.0:
             closest_match = search[1]
             db_image, db_face, db_landmarks = landmarks_db[closest_match]
-            image = transform.faceswap(db_image, db_landmarks, image, landmarks)
+            image = transform.faceswap(db_image, db_landmarks, image, face, landmarks)
         else:
             closest_match = "NA"
         center = (face.center().x, face.center().y)
