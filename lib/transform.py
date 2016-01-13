@@ -17,13 +17,23 @@ ALIGN_POINTS = (LEFT_BROW_POINTS + RIGHT_EYE_POINTS + LEFT_EYE_POINTS +
 
 # Points from the second image to overlay on the first. The convex hull of each
 # element will be overlaid.
-OVERLAY_POINTS = [
+OVERLAY_POINTS = (
     LEFT_EYE_POINTS + RIGHT_EYE_POINTS + LEFT_BROW_POINTS + RIGHT_BROW_POINTS,
     NOSE_POINTS + MOUTH_POINTS,
-]
+)
 
-def faceswap(face_image, face_landmarks, target_image, target_face, target_landmarks,
-             feather_amount=0.1, color_correct_blur_frac=0.8):
+import time
+def timer(fxn):
+    def _(*args, **kwargs):
+        start = time.time()
+        r = fxn(*args, **kwargs)
+        print "{}: {}s".format(fxn.__name__, time.time() - start)
+        return r
+    return _
+
+@timer
+def faceswap(face_face, face_image, face_landmarks, target_image, target_face, target_landmarks,
+             feather_amount=0.05, color_correct_blur_frac=0.8):
     """
     Perform a face swap where face_image and face_landmarks are the faces and
     face landmark points for the desired.  Target image and target landmarks
@@ -35,14 +45,20 @@ def faceswap(face_image, face_landmarks, target_image, target_face, target_landm
     M = transformation_from_points(target_landmarks[ALIGN_POINTS],
                                    face_landmarks[ALIGN_POINTS])
     
-    feather = int(max(target_face.width(), target_face.height()) *
-            feather_amount)
-    feather |= 0b1 # make odd
 
-    mask = get_face_mask(face_image, face_landmarks, feather)
+    feather_face = int(max(face_face.width(), face_face.height()) *
+            feather_amount)
+    feather_face |= 0b1 # make odd
+    feather_target = int(max(target_face.width(), target_face.height()) *
+            feather_amount)
+    feather_target |= 0b1 # make odd
+
+    print feather_face, feather_target
+
+    mask = get_face_mask(face_image, face_landmarks, feather_face)
     warped_mask = warp_im(mask, M, target_image.shape)
     combined_mask = np.max([
-        get_face_mask(target_image, target_landmarks, feather), 
+        get_face_mask(target_image, target_landmarks, feather_target), 
         warped_mask
     ], axis=0)
     
@@ -54,6 +70,7 @@ def faceswap(face_image, face_landmarks, target_image, target_face, target_landm
     output_im = target_image * (1.0 - combined_mask) + warped_corrected_target_image * combined_mask
     return output_im
 
+@timer
 def transformation_from_points(points1, points2):
     """
     Return an affine transformation [s * R | T] such that:
@@ -97,19 +114,19 @@ def transformation_from_points(points1, points2):
         np.array([0., 0., 1.])
     ])
 
+@timer
 def get_face_mask(im, landmarks, feather_amount):
     im = np.zeros(im.shape[:2], dtype=np.float64)
 
     for group in OVERLAY_POINTS:
         draw_convex_hull(im, landmarks[group], color=1)
 
-    im = np.array([im, im, im]).transpose((1, 2, 0))
-
     im = (cv2.GaussianBlur(im, (feather_amount, feather_amount), 0) > 0) * 1.0
     im = cv2.GaussianBlur(im, (feather_amount, feather_amount), 0)
-
+    im = np.array([im, im, im]).transpose((1, 2, 0))
     return im
     
+@timer
 def warp_im(im, M, dshape):
     output_im = np.zeros(dshape, dtype=im.dtype)
     cv2.warpAffine(im,
@@ -117,9 +134,10 @@ def warp_im(im, M, dshape):
                    (dshape[1], dshape[0]),
                    dst=output_im,
                    borderMode=cv2.BORDER_TRANSPARENT,
-                   flags=cv2.WARP_INVERSE_MAP | cv2.INTER_LANCZOS4)
+                   flags=cv2.WARP_INVERSE_MAP | cv2.INTER_AREA)
     return output_im
 
+@timer
 def correct_colours(im1, im2, landmarks1, color_correct_blur_frac):
     blur_amount = color_correct_blur_frac * np.linalg.norm(
                               np.mean(landmarks1[LEFT_EYE_POINTS], axis=0) -
@@ -136,6 +154,7 @@ def correct_colours(im1, im2, landmarks1, color_correct_blur_frac):
     return (im2.astype(np.float64) * im1_blur.astype(np.float64) /
                                                 im2_blur.astype(np.float64))
 
+@timer
 def draw_convex_hull(im, points, color):
     points = cv2.convexHull(points)
     cv2.fillConvexPoly(im, points, color=color)

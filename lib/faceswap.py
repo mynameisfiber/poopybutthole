@@ -1,8 +1,10 @@
 import cv2
 import dlib
 import numpy as np
+from PIL import Image
 
 import transform
+
 
 PREDICTOR_PATH = "data/shape_predictor_68_face_landmarks.dat"
 
@@ -51,39 +53,15 @@ def annotate_landmarks(im, landmarks):
         cv2.circle(im, pos, 3, color=(0, 255, 255, 0.5))
     return im
 
-def read_im_and_landmarks(fname, min_area=None):
-    im = cv2.imread(fname, cv2.IMREAD_COLOR)
-    landmark_gen = get_landmarks(im, min_area=min_area)
-    return im, landmark_gen
+def load_image(fd, resize=False):
+    data = np.fromstring(fd.read(), np.uint8)
+    image = cv2.imdecode(data, cv2.CV_LOAD_IMAGE_COLOR)
+    f = 1024.0 / image.shape[0]
+    if resize and f < 1:
+        image = cv2.resize(image, (0,0), fx=f, fy=f, interpolation=cv2.INTER_AREA)
+    return image
 
-
-if __name__ == "__main__":
-    from scipy.spatial import cKDTree
-    print "Making DB"
-    landmarks_db = []
-    db_files = ["images/micha_fb{}.jpg".format(i) for i in xrange(1,6)]
-    db_files += ['cruz.png', 'trump.jpg', "images/abby_fb1.jpg"]
-    for image in db_files:
-        db_image, landmarks_gen = read_im_and_landmarks(image)
-        landmarks_db.extend([(db_image, f, l) for f,l in landmarks_gen])
-    data = [normalize_landmarks(f, l) for _, f,l in landmarks_db]
-    database = cKDTree(data)
-
-    print "Matching faces"
-    image, landmarks_gen = read_im_and_landmarks("images/micha_fb6.jpg")
-    for i, (face, landmarks) in enumerate(landmarks_gen):
-        norm_landmarks = normalize_landmarks(face, landmarks)
-        search = database.query(norm_landmarks)
-        print search
-        if search[0] < 2.0:
-            closest_match = search[1]
-            db_image, db_face, db_landmarks = landmarks_db[closest_match]
-            image = transform.faceswap(db_image, db_landmarks, image, face, landmarks)
-        else:
-            closest_match = "NA"
-        center = (face.center().x, face.center().y)
-        cv2.putText(image, str(closest_match), center,
-                    fontFace=cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,
-                    fontScale=1,
-                    color=(255, 0, 255))
-    cv2.imwrite("matches.jpg", image)
+def process_image(fd, min_area=None, resize=False):
+    image = load_image(fd, resize=resize)
+    landmark_gen = get_landmarks(image, min_area=min_area)
+    return image, landmark_gen
