@@ -23,9 +23,8 @@ class PoopyButthole(web.RequestHandler):
 
         if True or not path.exists(image_path):
             image_fd = StringIO(image_body)
-            image, landmarks_gen = faceswap.process_image(image_fd, resize=True)
             facedb = self.application.settings['facedb']
-            new_image = facedb.swap(image, landmarks_gen, image_set, threshold=threshold)
+            new_image = facedb.swap(image_fd, image_set, threshold=threshold)
             cv2.imwrite(image_path, new_image)
         self.redirect("/poopy/image?id=" + str(_id))
 
